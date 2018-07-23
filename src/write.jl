@@ -44,7 +44,7 @@ function writexlsx(output_filepath::AbstractString, xf::XLSXFile; rewrite::Bool=
     end
 
     close(xlsx)
-
+    close(io)
     nothing
 end
 
@@ -193,11 +193,11 @@ function setdata!(ws::Worksheet, cell::Cell)
 end
 
 function xlsxescape(str::AbstractString)
-    str = replace(str, '"', "&quot;")
-    str = replace(str, '&', "&amp;")
-    str = replace(str, '<', "&lt;")
-    str = replace(str, '>', "&gt;")
-    return replace(str, "'", "&apos;")
+    str = replace(str, '"' => "&quot;")
+    str = replace(str, '&' => "&amp;")
+    str = replace(str, '<' => "&lt;")
+    str = replace(str, '>' => "&gt;")
+    return replace(str, "'" => "&apos;")
 end
 
 """
@@ -211,7 +211,7 @@ function xlsx_encode(ws::Worksheet, val::AbstractString)
     return ("s", string(sst_ind))
 end
 
-xlsx_encode(::Worksheet, val::Missings.Missing) = ("", "")
+xlsx_encode(::Worksheet, val::Missing) = ("", "")
 xlsx_encode(::Worksheet, val::Bool) = ("b", val ? "1" : "0")
 xlsx_encode(::Worksheet, val::Union{Int, Float64}) = ("", string(val))
 xlsx_encode(ws::Worksheet, val::Date) = ("", string(date_to_excel_value(val, isdate1904(get_xlsxfile(ws)))))

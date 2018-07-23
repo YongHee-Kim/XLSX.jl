@@ -51,7 +51,7 @@ struct CellDataFormat <: AbstractCellDataFormat
     id::UInt
 end
 
-const CellValueType = Union{String, Missings.Missing, Float64, Int, Bool, Dates.Date, Dates.Time, Dates.DateTime}
+const CellValueType = Union{String, Missing, Float64, Int, Bool, Dates.Date, Dates.Time, Dates.DateTime}
 """
 CellValue is a Julia type of a value read from a Spreadsheet.
 """
@@ -190,7 +190,7 @@ mutable struct SharedStrings
     is_loaded::Bool # for lazy-loading of sst XML file
 end
 
-const DefinedNameValueTypes = Union{SheetCellRef, SheetCellRange, Int, Float64, String, Missings.Missing}
+const DefinedNameValueTypes = Union{SheetCellRef, SheetCellRange, Int, Float64, String, Missing}
 
 """
 Workbook is the result of parsing file `xl/workbook.xml`.
@@ -232,7 +232,7 @@ mutable struct XLSXFile <: MSOfficePackage
         io = ZipFile.Reader(filepath)
         xl = new(filepath, use_cache, io, true, Dict{String, Bool}(), Dict{String, EzXML.Document}(), Dict{String, Vector{UInt8}}(), EmptyWorkbook(), Vector{Relationship}(), is_writable)
         xl.workbook.package = xl
-        finalizer(xl, close)
+        finalizer(close, xl)
         return xl
     end
 end
@@ -273,7 +273,7 @@ struct TableRowIterator
     index::Index
     first_data_row::Int
     stop_in_empty_row::Bool
-    stop_in_row_function::Union{Function, Void}
+    stop_in_row_function::Union{Function, Nothing}
 end
 
 struct TableRow
