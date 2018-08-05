@@ -79,6 +79,10 @@ function readtable(filepath::AbstractString, sheet::Union{AbstractString, Int}; 
     return c
 end
 
+function readtable(::Type{DataFrames.DataFrame}, filepath::AbstractString, sheet::Union{AbstractString, Int}; first_row::Int = 1, column_labels::Vector{Symbol}=Vector{Symbol}(), header::Bool=true, infer_eltypes::Bool=false, stop_in_empty_row::Bool=true, stop_in_row_function::Union{Function, Void}=nothing, enable_cache::Bool=false) :: DataFrames.DataFrame
+    return DataFrames.DataFrame(readtable(filepath, sheet, first_row=first_row, column_labels=column_labels, header=header, infer_eltypes=infer_eltypes, stop_in_empty_row=stop_in_empty_row, stop_in_row_function=stop_in_row_function, enable_cache=enable_cache)...)
+end
+
 """
     writetable(filename, data, columnnames; [rewrite], [sheetname])
 
@@ -117,6 +121,10 @@ function writetable(filename::AbstractString, data, columnnames; rewrite::Bool=f
     # write output file
     writexlsx(filename, xf, rewrite=rewrite)
     nothing
+end
+
+function writetable(filename::AbstractString, df::DataFrames.DataFrame; rewrite::Bool=false, sheetname::AbstractString="", anchor_cell::Union{String, CellRef}=CellRef("A1"))
+    writetable(filename, DataFrames.columns(df), DataFrames.names(df); rewrite=rewrite, sheetname=sheetname, anchor_cell=anchor_cell)
 end
 
 """

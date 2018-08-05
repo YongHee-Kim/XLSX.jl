@@ -2,7 +2,7 @@
 __precompile__(true)
 module XLSX
 
-import ZipFile, EzXML, Missings
+import ZipFile, EzXML, Missings, DataFrames
 
 # https://github.com/fhs/ZipFile.jl/issues/39
 if !method_exists(Base.nb_available, Tuple{ZipFile.ReadableFile})
