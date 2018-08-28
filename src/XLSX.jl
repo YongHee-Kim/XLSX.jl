@@ -2,7 +2,8 @@
 __precompile__(true)
 module XLSX
 
-import ZipFile, EzXML
+import ZipFile
+import EzXML
 using Dates, Printf
 
 # https://github.com/fhs/ZipFile.jl/issues/39
