@@ -436,9 +436,8 @@ function Base.close(xl::XLSXFile)
 
     # close all internal file streams from worksheet caches
     for sheet in xl.workbook.sheets
-        if !isnull(sheet.cache)
-            cache = get(sheet.cache)
         if !ismissing(sheet.cache)
+            cache = get(sheet.cache)
             close(cache.stream_state)
         end
     end
