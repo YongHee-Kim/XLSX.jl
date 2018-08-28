@@ -78,7 +78,7 @@ Example for `stop_in_row_function`:
 ```
 function stop_function(r)
     v = r[:col_label]
-    return !Missings.ismissing(v) && v == "unwanted value"
+    return !Missing.ismissing(v) && v == "unwanted value"
 end
 ```
 
@@ -94,7 +94,7 @@ end
 
 See also `gettable`.
 """
-function eachtablerow(sheet::Worksheet, cols::Union{ColumnRange, AbstractString}; first_row::Int=_find_first_row_with_data(sheet, convert(ColumnRange, cols).start), column_labels::Vector{Symbol}=Vector{Symbol}(), header::Bool=true, stop_in_empty_row::Bool=true, stop_in_row_function::Union{Function, Void}=nothing) :: TableRowIterator
+function eachtablerow(sheet::Worksheet, cols::Union{ColumnRange, AbstractString}; first_row::Int=_find_first_row_with_data(sheet, convert(ColumnRange, cols).start), column_labels::Vector{Symbol}=Vector{Symbol}(), header::Bool=true, stop_in_empty_row::Bool=true, stop_in_row_function::Union{Function, Nothing}=nothing) :: TableRowIterator
     itr = eachrow(sheet)
     column_range = convert(ColumnRange, cols)
 
@@ -122,7 +122,7 @@ function eachtablerow(sheet::Worksheet, cols::Union{ColumnRange, AbstractString}
     return TableRowIterator(itr, Index(column_range, column_labels), first_data_row, stop_in_empty_row, stop_in_row_function)
 end
 
-function eachtablerow(sheet::Worksheet; first_row::Int = 1, column_labels::Vector{Symbol}=Vector{Symbol}(), header::Bool=true, stop_in_empty_row::Bool=true, stop_in_row_function::Union{Function, Void}=nothing) :: TableRowIterator
+function eachtablerow(sheet::Worksheet; first_row::Int = 1, column_labels::Vector{Symbol}=Vector{Symbol}(), header::Bool=true, stop_in_empty_row::Bool=true, stop_in_row_function::Union{Function, Nothing}=nothing) :: TableRowIterator
     for r in eachrow(sheet)
 
         # skip rows until we reach first_row
@@ -134,7 +134,7 @@ function eachtablerow(sheet::Worksheet; first_row::Int = 1, column_labels::Vecto
             columns_ordered = sort(collect(keys(r.rowcells)))
 
             for (ci, cn) in enumerate(columns_ordered)
-                if !Missings.ismissing(getdata(r, cn))
+                if !Missing.ismissing(getdata(r, cn))
                     # found a row with data. Will get ColumnRange from non-empty consecutive cells
                     first_row = row_number(r)
                     column_start = cn
@@ -150,7 +150,7 @@ function eachtablerow(sheet::Worksheet; first_row::Int = 1, column_labels::Vecto
                             cn_stop = columns_ordered[ci_stop]
 
                             # Will stop if finds an empty cell or a skipped column
-                            if Missings.ismissing(getdata(r, cn_stop)) || (cn_stop - 1 != column_stop)
+                            if Missing.ismissing(getdata(r, cn_stop)) || (cn_stop - 1 != column_stop)
                                 column_range = ColumnRange(column_start, column_stop)
                                 return eachtablerow(sheet, column_range; first_row=first_row, column_labels=column_labels, header=header, stop_in_empty_row=stop_in_empty_row, stop_in_row_function=stop_in_row_function)
                             end
@@ -172,7 +172,7 @@ end
 function _find_first_row_with_data(sheet::Worksheet, column_number::Int)
     # will find first_row
     for r in eachrow(sheet)
-        if !Missings.ismissing(getdata(r, column_number))
+        if !Missing.ismissing(getdata(r, column_number))
             return row_number(r)
         end
     end
@@ -206,10 +206,10 @@ Maps table column index (1-based) -> sheet column index (cellref based)
 @inline get_column_label(r::TableRow, table_column_number::Int) = get_column_labels(r)[table_column_number]
 
 # iterate into TableRow to get each column value
-Base.start(r::TableRow) = start(table_column_numbers(r))
-Base.done(r::TableRow, state) = done(table_column_numbers(r), state)
+start(r::TableRow) = start(table_column_numbers(r))
+done(r::TableRow, state) = done(table_column_numbers(r), state)
 
-function Base.next(r::TableRow, state)
+function next(r::TableRow, state)
     (next_column_number, next_state) = next(table_column_numbers(r), state)
     return (r[next_column_number], next_state)
 end
@@ -242,7 +242,7 @@ function getdata(r::TableRow, column_label::Symbol)
 end
 
 
-function Base.start(itr::TableRowIterator)
+function start(itr::TableRowIterator)
     last_state = start(itr.itr)
 
     # go to the first_data_row
@@ -257,7 +257,7 @@ function Base.start(itr::TableRowIterator)
     return TableRowIteratorState(state, sheet_row, 1, itr.first_data_row, true)
 end
 
-function Base.next(itr::TableRowIterator, state::TableRowIteratorState)
+function next(itr::TableRowIterator, state::TableRowIteratorState)
     sheet_row_itr_is_done = done(itr.itr, state.state)
     current_sheet_row = state.sheet_row
     current_sheet_row_number = row_number(current_sheet_row)
@@ -271,7 +271,7 @@ function Base.next(itr::TableRowIterator, state::TableRowIteratorState)
     return TableRow(itr, current_sheet_row, state.table_row_index), TableRowIteratorState(next_state, next_sheet_row, state.table_row_index+1, current_sheet_row_number, sheet_row_itr_is_done)
 end
 
-function Base.done(itr::TableRowIterator, state::TableRowIteratorState)
+function done(itr::TableRowIterator, state::TableRowIteratorState)
 
     # user asked to stop
     if isa(itr.stop_in_row_function, Function) && itr.stop_in_row_function(TableRow(itr, state.sheet_row, state.table_row_index))
@@ -297,7 +297,7 @@ function Base.done(itr::TableRowIterator, state::TableRowIteratorState)
 
     # check if there are any data inside column range
     for c in sheet_column_numbers(itr.index)
-        if !Missings.ismissing(getdata(get_worksheet(itr), getcell(state.sheet_row, c)))
+        if !Missing.ismissing(getdata(get_worksheet(itr), getcell(state.sheet_row, c)))
             return false
         end
     end
@@ -314,7 +314,7 @@ function infer_eltype(v::Vector{Any})
     end
 
     for i in 1:length(v)
-        if Missings.ismissing(v[i])
+        if Missing.ismissing(v[i])
             hasmissing = true
         else
             if t != Any && typeof(v[i]) != t
@@ -329,7 +329,7 @@ function infer_eltype(v::Vector{Any})
         return Any
     else
         if hasmissing
-            return Union{Missings.Missing, t}
+            return Union{Missing.Missing, t}
         else
             return t
         end
@@ -351,7 +351,7 @@ function gettable(itr::TableRowIterator; infer_eltypes::Bool=false)
 
         for (ci, cv) in enumerate(r) # iterate a TableRow to get column data
             push!(data[ci], cv)
-            if !Missings.ismissing(cv)
+            if !Missing.ismissing(cv)
                 is_empty_row = false
             end
         end
@@ -417,7 +417,7 @@ Example for `stop_in_row_function`:
 ```
 function stop_function(r)
     v = r[:col_label]
-    return !Missings.ismissing(v) && v == "unwanted value"
+    return !Missing.ismissing(v) && v == "unwanted value"
 end
 ```
 
@@ -435,12 +435,12 @@ julia> df = XLSX.openxlsx("myfile.xlsx") do xf
 
 See also: `readtable`.
 """
-function gettable(sheet::Worksheet, cols::Union{ColumnRange, AbstractString}; first_row::Int=_find_first_row_with_data(sheet, convert(ColumnRange, cols).start), column_labels::Vector{Symbol}=Vector{Symbol}(), header::Bool=true, infer_eltypes::Bool=false, stop_in_empty_row::Bool=true, stop_in_row_function::Union{Function, Void}=nothing)
+function gettable(sheet::Worksheet, cols::Union{ColumnRange, AbstractString}; first_row::Int=_find_first_row_with_data(sheet, convert(ColumnRange, cols).start), column_labels::Vector{Symbol}=Vector{Symbol}(), header::Bool=true, infer_eltypes::Bool=false, stop_in_empty_row::Bool=true, stop_in_row_function::Union{Function, Nothing}=nothing)
     itr = eachtablerow(sheet, cols; first_row=first_row, column_labels=column_labels, header=header, stop_in_empty_row=stop_in_empty_row, stop_in_row_function=stop_in_row_function)
     return gettable(itr; infer_eltypes=infer_eltypes)
 end
 
-function gettable(sheet::Worksheet; first_row::Int = 1, column_labels::Vector{Symbol}=Vector{Symbol}(), header::Bool=true, infer_eltypes::Bool=false, stop_in_empty_row::Bool=true, stop_in_row_function::Union{Function, Void}=nothing)
+function gettable(sheet::Worksheet; first_row::Int = 1, column_labels::Vector{Symbol}=Vector{Symbol}(), header::Bool=true, infer_eltypes::Bool=false, stop_in_empty_row::Bool=true, stop_in_row_function::Union{Function, Nothing}=nothing)
     itr = eachtablerow(sheet; first_row=first_row, column_labels=column_labels, header=header, stop_in_empty_row=stop_in_empty_row, stop_in_row_function=stop_in_row_function)
     return gettable(itr; infer_eltypes=infer_eltypes)
 end

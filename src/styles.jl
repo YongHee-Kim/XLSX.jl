@@ -57,6 +57,7 @@ end
 # get styles document for workbook
 function styles_xmlroot(workbook::Workbook)
     if isnull(workbook.styles_xroot)
+        styles_root = missing
         STYLES_RELATIONSHIP_TYPE = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles"
         if has_relationship_by_type(workbook, STYLES_RELATIONSHIP_TYPE)
             styles_target = get_relationship_target_by_type(workbook, STYLES_RELATIONSHIP_TYPE)
@@ -65,7 +66,7 @@ function styles_xmlroot(workbook::Workbook)
             # check root node name for styles.xml
             @assert get_default_namespace(styles_root) == SPREADSHEET_NAMESPACE_XPATH_ARG[1][2] "Unsupported styles XML namespace $(get_default_namespace(styles_root))."
             @assert EzXML.nodename(styles_root) == "styleSheet" "Malformed package. Expected root node named `styleSheet` in `styles.xml`."
-            workbook.styles_xroot = Nullable(styles_root)
+            workbook.styles_xroot = styles_root
         else
             error("Styles not found for this workbook.")
         end
@@ -215,7 +216,7 @@ function styles_is_float(wb::Workbook, index::Int) :: Bool
                 [0#?]/[0#?]|
                 %
                 """ix
-            if ismatch(floatformats, code)
+            if occursin(floatformats, code)
                 isfloat = true
             end
         end

@@ -76,7 +76,7 @@ Will return a stream reader positioned in the first row element if it exists.
 If there's no row element inside sheetData XML tag, it will return a closed iterator
 with `done_reading=true`.
 """
-function Base.start(itr::SheetRowStreamIterator)
+function start(itr::SheetRowStreamIterator)
     ws = get_worksheet(itr)
     target_file = "xl/" * get_relationship_target_by_id(get_workbook(ws), ws.relationship_id)
     zip_io, reader = open_internal_file_stream(get_xlsxfile(ws), target_file)
@@ -113,9 +113,9 @@ function Base.start(itr::SheetRowStreamIterator)
     return result
 end
 
-@inline Base.done(itr::SheetRowStreamIterator, state::SheetRowStreamIteratorState) = state.done_reading
+@inline done(itr::SheetRowStreamIterator, state::SheetRowStreamIteratorState) = state.done_reading
 
-function Base.next(itr::SheetRowStreamIterator, state::SheetRowStreamIteratorState)
+function next(itr::SheetRowStreamIterator, state::SheetRowStreamIteratorState)
     @assert isopen(state) "Can't fetch rows from a closed workbook."
     # will read next row from stream.
     # The stream should be already positioned in the next row
@@ -208,9 +208,9 @@ end
 @inline get_worksheet(itr::WorksheetCache) = get_worksheet(itr.stream_iterator)
 
 # state is the row number. At the start state, no row has been ready, so let's set to 0.
-Base.start(itr::WorksheetCache) = 0
+start(itr::WorksheetCache) = 0
 
-function Base.done(ws_cache::WorksheetCache, row_from_last_iteration::Int)
+function done(ws_cache::WorksheetCache, row_from_last_iteration::Int)
     ws = get_worksheet(ws_cache)
 
     if done(ws_cache.stream_iterator, ws_cache.stream_state)
@@ -232,7 +232,7 @@ end
 # (i, state) = next(I, state)
 # state is the row number
 # i is a SheetRow
-function Base.next(ws_cache::WorksheetCache, row_from_last_iteration::Int)
+function next(ws_cache::WorksheetCache, row_from_last_iteration::Int)
 
     # fetches the next row
     if row_from_last_iteration == 0 && !isempty(ws_cache.rows_in_cache)

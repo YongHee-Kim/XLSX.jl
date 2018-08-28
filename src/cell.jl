@@ -74,7 +74,7 @@ function Cell(c::EzXML.Node)
     return Cell(ref, t, s, v, f)
 end
 
-@inline getdata(ws::Worksheet, empty::EmptyCell) = Missings.missing
+@inline getdata(ws::Worksheet, empty::EmptyCell) = missing
 
 const RGX_INTEGER = r"^\-?[0-9]+$"
 
@@ -91,12 +91,12 @@ For numbers, if the style implies that the number is visualized with decimals,
 the method will return a float, even if the underlying number is stored
 as an integer inside the spreadsheet XML.
 
-If `cell` has empty value or empty `String`, this function will return `Missings.missing`.
+If `cell` has empty value or empty `String`, this function will return `missing`.
 """
 function getdata(ws::Worksheet, cell::Cell) :: CellValueType
 
     if iserror(cell)
-        return Missings.missing
+        return missing
     end
 
     if cell.datatype == "inlineStr"
@@ -108,7 +108,7 @@ function getdata(ws::Worksheet, cell::Cell) :: CellValueType
         str = sst_unformatted_string(ws, cell.value)
 
         if isempty(str)
-            return Missings.missing
+            return missing
         else
             return str
         end
@@ -116,7 +116,7 @@ function getdata(ws::Worksheet, cell::Cell) :: CellValueType
     elseif (isempty(cell.datatype) || cell.datatype == "n")
 
         if isempty(cell.value)
-            return Missings.missing
+            return missing
         end
 
         if !isempty(cell.style) && styles_is_datetime(ws, cell.style)
@@ -130,7 +130,7 @@ function getdata(ws::Worksheet, cell::Cell) :: CellValueType
 
         else
             # fallback to unformatted number
-            if ismatch(RGX_INTEGER, cell.value)  # if contains only numbers
+            if occursin(RGX_INTEGER, cell.value)  # if contains only numbers
                 v_num = parse(Int, cell.value)
             else
                 v_num = parse(Float64, cell.value)
@@ -149,7 +149,7 @@ function getdata(ws::Worksheet, cell::Cell) :: CellValueType
     elseif cell.datatype == "str"
         # plain string
         if isempty(cell.value)
-            return Missings.missing
+            return missing
         else
             return cell.value
         end

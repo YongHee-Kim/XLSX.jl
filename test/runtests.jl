@@ -1,8 +1,9 @@
 
 import XLSX
-using Base.Test, Missings
+using Test
+using Dates
 
-data_directory = joinpath(Pkg.dir("XLSX"), "data")
+data_directory = joinpath(@__DIR__, "../data")
 
 @testset "read test files" begin
     ef_blank_ptbr_1904 = XLSX.readxlsx(joinpath(data_directory, "blank_ptbr_1904.xlsx"))
@@ -480,7 +481,7 @@ end
     @test !XLSX.is_defined_name_value_a_reference(1)
     @test !XLSX.is_defined_name_value_a_reference(1.2)
     @test !XLSX.is_defined_name_value_a_reference("Hey")
-    @test !XLSX.is_defined_name_value_a_reference(Missings.missing)
+    @test !XLSX.is_defined_name_value_a_reference(missing)
 
     XLSX.openxlsx(joinpath(data_directory, "general.xlsx")) do f
         @test f["SINGLE_CELL"] == "single cell A2"
@@ -701,12 +702,12 @@ end
 
     function stop_function(r::XLSX.TableRow)
         v = r[Symbol("Column C")]
-        return !Missings.ismissing(v) && v == "Str2"
+        return !ismissing(v) && v == "Str2"
     end
 
     function never_reaches_stop(r::XLSX.TableRow)
         v = r[Symbol("Column C")]
-        return !Missings.ismissing(v) && v == "never was found"
+        return !ismissing(v) && v == "never was found"
     end
 
     data, col_names = XLSX.gettable(s, stop_in_row_function=never_reaches_stop)
@@ -1006,10 +1007,10 @@ end
     @testset "single" begin
         col_names = ["Integers", "Strings", "Floats", "Booleans", "Dates", "Times", "DateTimes"]
         data = Vector{Any}(7)
-        data[1] = [1, 2, Missings.missing, 4]
+        data[1] = [1, 2, missing, 4]
         data[2] = ["Hey", "You", "Out", "There"]
-        data[3] = [101.5, 102.5, Missings.missing, 104.5]
-        data[4] = [ true, false, Missings.missing, true]
+        data[3] = [101.5, 102.5, missing, 104.5]
+        data[4] = [ true, false, missing, true]
         data[5] = [ Date(2018, 2, 1), Date(2018, 3, 1), Date(2018,5,20), Date(2018, 6, 2)]
         data[6] = [ Dates.Time(19, 10), Dates.Time(19, 20), Dates.Time(19, 30), Dates.Time(19, 40) ]
         data[7] = [ Dates.DateTime(2018, 5, 20, 19, 10), Dates.DateTime(2018, 5, 20, 19, 20), Dates.DateTime(2018, 5, 20, 19, 30), Dates.DateTime(2018, 5, 20, 19, 40)]
@@ -1083,6 +1084,7 @@ end
         isfile(f) && rm(f)
     end
 end
+
 
 @testset "Styles" begin
 

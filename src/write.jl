@@ -74,7 +74,7 @@ function writexlsx(output_filepath::AbstractString, xf::XLSXFile; overwrite::Boo
     close(xlsx)
 
     # fix libuv issue on windows (#42)
-    @static is_windows() ? gc() : nothing
+    Sys.iswindows ? gc() : nothing
 end
 
 get_worksheet_internal_file(ws::Worksheet) = "xl/" * get_relationship_target_by_id(get_workbook(ws), ws.relationship_id)
@@ -258,7 +258,7 @@ function xlsx_encode(ws::Worksheet, val::AbstractString)
     return ("s", string(sst_ind))
 end
 
-xlsx_encode(::Worksheet, val::Missings.Missing) = ("", "")
+xlsx_encode(::Worksheet, val::Missing) = ("", "")
 xlsx_encode(::Worksheet, val::Bool) = ("b", val ? "1" : "0")
 xlsx_encode(::Worksheet, val::Union{Int, Float64}) = ("", string(val))
 xlsx_encode(ws::Worksheet, val::Date) = ("", string(date_to_excel_value(val, isdate1904(get_xlsxfile(ws)))))
@@ -283,12 +283,12 @@ function writetable!(sheet::Worksheet, data, columnnames; anchor_cell::CellRef=C
 
     # read dimensions
     col_count = length(data)
-    @assert col_count == length(columnnames) "Column count mismatch between `data` ($col_count columns) and `columnnames` ($(length(columnnames)) columns)."
+    @assert col_count == length(columnnames) "Column count moccursin between `data` ($col_count columns) and `columnnames` ($(length(columnnames)) columns)."
     @assert col_count > 0 "Can't write table with no columns."
     row_count = length(data[1])
     if col_count > 1
         for c in 2:col_count
-            @assert length(data[c]) == row_count "Row count mismatch between column 1 ($row_count rows) and column $c ($(length(data[c])) rows)."
+            @assert length(data[c]) == row_count "Row count moccursin between column 1 ($row_count rows) and column $c ($(length(data[c])) rows)."
         end
     end
 
@@ -316,7 +316,7 @@ end
 function Base.setindex!(sheet::Worksheet, data::AbstractVector, row::Integer, cols::UnitRange{<:Integer})
     col_count = length(data)
 
-    @assert col_count == length(cols) "Column count mismatch between `data` ($col_count columns) and column range $cols ($(length(cols)) columns)."
+    @assert col_count == length(cols) "Column count moccursin between `data` ($col_count columns) and column range $cols ($(length(cols)) columns)."
 
     for c in 1:col_count
         target_cell_ref = CellRef(row, c + first(cols) - 1)

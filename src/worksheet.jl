@@ -76,7 +76,7 @@ getdata(ws::Worksheet, single::CellRef) = getdata(ws, getcell(ws, single))
 
 function getdata(ws::Worksheet, rng::CellRange) :: Array{Any,2}
     result = Array{Any, 2}(size(rng))
-    fill!(result, Missings.missing)
+    fill!(result, Missing.missing)
 
     top = row_number(rng.start)
     bottom = row_number(rng.stop)
