@@ -175,7 +175,6 @@ mutable struct Worksheet
     cache::Union{Missing, WorksheetCache}
 
     function Worksheet(package::MSOfficePackage, sheetId::Int, relationship_id::String, name::String, dimension::CellRange)
-        new(package, sheetId, relationship_id, name, dimension, Union{Missing, WorksheetCache}())
     end
 end
 

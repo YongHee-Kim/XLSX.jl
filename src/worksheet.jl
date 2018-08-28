@@ -34,10 +34,10 @@ function read_worksheet_dimension(xf::XLSXFile, relationship_id, name) :: CellRa
     close(reader)
     close(zip_io)
 
-    if isnull(result)
+    if ismissing(result)
         error("Couldn't parse worksheet $name dimension.")
     else
-        return get(result)
+        return result
     end
 end
 
