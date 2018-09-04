@@ -34,7 +34,7 @@ Consider using `openxlsx` for lazy loading of Excel file contents.
 @inline readxlsx(filepath::AbstractString) :: XLSXFile = open_or_read_xlsx(filepath, true, true, false)
 
 """
-    openxlsx(f::Function, filename::AbstractString; mode::AbstractString="r", enable_cache::Bool=true)
+    openxlsx(f::Function, filepath::AbstractString; mode::AbstractString="r", enable_cache::Bool=true)
 
 Open XLSX file for reading and/or writing. It returns an opened XLSXFile that will be automatically closed after applying `f` to the file.
 
@@ -52,15 +52,15 @@ end
 
 The `mode` argument controls how the file is opened. The following modes are allowed:
 
-* `r` : read mode. The existing data in `filename` will be accessible for reading. This is the **default** mode.
+* `r` : read mode. The existing data in `filepath` will be accessible for reading. This is the **default** mode.
 
-* `w` : write mode. Opens an empty file that will be written to `filename`.
+* `w` : write mode. Opens an empty file that will be written to `filepath`.
 
-* `rw` : edit mode. Opens `filename` for editing. The file will be saved to disk when the function ends.
+* `rw` : edit mode. Opens `filepath` for editing. The file will be saved to disk when the function ends.
 
 # Arguments
 
-* `filename` is the name of the file.
+* `filepath` is the complete path to the file.
 
 * `mode` is the file mode, as explained in the last section.
 
@@ -110,12 +110,13 @@ end
 
 See also `readxlsx` method.
 """
-function openxlsx(f::Function, filename::AbstractString; mode::AbstractString="r", enable_cache::Bool=true)
+function openxlsx(f::Function, filepath::AbstractString; mode::AbstractString="r", enable_cache::Bool=true)
 
     _read, _write = parse_file_mode(mode)
 
-    if isfile(filename) && _read
-        xf = open_or_read_xlsx(filename, _write, enable_cache, _write)
+    if _read
+        @assert isfile(filepath) "File $filepath not found."
+        xf = open_or_read_xlsx(filepath, _write, enable_cache, _write)
     else
         xf = open_empty_template()
     end
@@ -125,13 +126,17 @@ function openxlsx(f::Function, filename::AbstractString; mode::AbstractString="r
     finally
 
         if _write
-            writexlsx(filename, xf, overwrite=true)
+            writexlsx(filepath, xf, overwrite=true)
         else
             close(xf)
         end
 
         # fix libuv issue on windows (#42)
+<<<<<<< HEAD
         Sys.iswindows() ? gc() : nothing
+=======
+        @static Sys.iswindows() ? GC.gc() : nothing
+>>>>>>> upstream/master
     end
 end
 
@@ -339,14 +344,22 @@ function parse_workbook!(xf::XLSXFile)
                 elseif occursin(r"^\".*\"$", defined_value_string) # is enclosed by quotes
                     defined_value = defined_value_string[2:end-1] # remove enclosing quotes
                     if isempty(defined_value)
+<<<<<<< HEAD
                         defined_value = Missing.missing
+=======
+                        defined_value = missing
+>>>>>>> upstream/master
                     end
                 elseif tryparse(Int, defined_value_string)
                     defined_value = parse(Int, defined_value_string)
                 elseif tryparse(Float64, defined_value_string)
                     defined_value = parse(Float64, defined_value_string)
                 elseif isempty(defined_value_string)
+<<<<<<< HEAD
                     defined_value = Missing.missing
+=======
+                    defined_value = missing
+>>>>>>> upstream/master
                 else
 
                     # Couldn't parse definedName. Will silently ignore it, since this is not a critical feature.
@@ -436,9 +449,14 @@ function Base.close(xl::XLSXFile)
 
     # close all internal file streams from worksheet caches
     for sheet in xl.workbook.sheets
+<<<<<<< HEAD
         if !ismissing(sheet.cache)
             cache = get(sheet.cache)
             close(cache.stream_state)
+=======
+        if sheet.cache != nothing && sheet.cache.stream_state != nothing
+            close(sheet.cache.stream_state)
+>>>>>>> upstream/master
         end
     end
 end
@@ -518,11 +536,15 @@ Example for `stop_in_row_function`:
 ```
 function stop_function(r)
     v = r[:col_label]
+<<<<<<< HEAD
     return !Missing.ismissing(v) && v == "unwanted value"
+=======
+    return !ismissing(v) && v == "unwanted value"
+>>>>>>> upstream/master
 end
 ```
 
-Rows where all column values are equal to `Missing.missing` are dropped.
+Rows where all column values are equal to `missing` are dropped.
 
 Example code for `readtable`:
 
@@ -534,7 +556,11 @@ julia> df = DataFrame(XLSX.readtable("myfile.xlsx", "mysheet")...)
 See also: `gettable`.
 ```
 """
+<<<<<<< HEAD
 function readtable(filepath::AbstractString, sheet::Union{AbstractString, Int}; first_row::Int = 1, column_labels::Vector{Symbol}=Vector{Symbol}(), header::Bool=true, infer_eltypes::Bool=false, stop_in_empty_row::Bool=true, stop_in_row_function::Union{Function, Nothing}=nothing, enable_cache::Bool=false)
+=======
+function readtable(filepath::AbstractString, sheet::Union{AbstractString, Int}; first_row::Int = 1, column_labels::Vector{Symbol}=Vector{Symbol}(), header::Bool=true, infer_eltypes::Bool=false, stop_in_empty_row::Bool=true, stop_in_row_function::Union{Nothing, Function}=nothing, enable_cache::Bool=false)
+>>>>>>> upstream/master
     c = openxlsx(filepath, enable_cache=enable_cache) do xf
         gettable(getsheet(xf, sheet); first_row=first_row, column_labels=column_labels, header=header, infer_eltypes=infer_eltypes, stop_in_empty_row=stop_in_empty_row, stop_in_row_function=stop_in_row_function)
     end

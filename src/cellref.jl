@@ -5,7 +5,11 @@ function CellRef(n::AbstractString)
     return CellRef(n, row_number, decode_column_number(column_name))
 end
 
-CellRef(row::Int, col::Int) = CellRef(encode_column_number(col) * string(row))
+@inline CellRef(row::Int, col::Int) = CellRef(encode_column_number(col) * string(row))
+@inline CellPosition(ref::CellRef) = CellPosition(row_number(ref), column_number(ref))
+@inline row_number(p::CellPosition) = p.row
+@inline column_number(p::CellPosition) = p.column
+@inline CellRef(p::CellPosition) = CellRef(row_number(p), column_number(p))
 
 """
     decode_column_number(column_name::AbstractString) :: Int
@@ -38,6 +42,8 @@ end
     encode_column_number(column_number::Int) :: String
 
 Converts column number to a column name.
+
+# Example
 
 ```julia
 julia> XLSX.encode_column_number(4)
@@ -97,7 +103,16 @@ const RGX_CELLNAME_LEFT = r"^[A-Z]+"
 const RGX_CELLNAME_RIGHT = r"[0-9]+$"
 
 """
-Returns tuple (column_name, row_number).
+    split_cellname(n::AbstractString) -> column_name, row_number
+
+Splits a string representing a cell name to its column name and row number.
+
+# Example
+
+```julia
+julia> XLSX.split_cellname("AB:12")
+("AB:", 12)
+```
 """
 @inline function split_cellname(n::AbstractString)
     for (i, c) in enumerate(n)
@@ -112,7 +127,13 @@ Returns tuple (column_name, row_number).
     error("Couldn't split (column_name, row) for cellname $n.")
 end
 
-# Cellname is bounded by A1 : XFD1048576
+"""
+    is_valid_cellname(n::AbstractString) :: Bool
+
+Checks wether `n` is a valid name for a cell.
+
+Cell names are bounded by `A1 : XFD1048576`.
+"""
 function is_valid_cellname(n::AbstractString) :: Bool
 
     if !occursin(RGX_CELLNAME, n)
@@ -136,10 +157,20 @@ const RGX_CELLRANGE_START = r"^[A-Z]+[0-9]+"
 const RGX_CELLRANGE_STOP = r"[A-Z]+[0-9]+$"
 
 """
-Returns tuple (start_name, stop_name).
+    split_cellrange(n::AbstractString) -> start_name, stop_name
+
+Splits a string representing a cell range into its cell names.
+
+# Example
+
+```julia
+julia> XLSX.split_cellrange("AB12:CD24")
+("AB12", "CD24")
+```
 """
 @inline function split_cellrange(n::AbstractString)
     s = split(n, ":")
+    @assert length(s) == 2 "$n is not a valid cell range."
     return s[1], s[2]
 end
 
@@ -318,6 +349,7 @@ convert(::Type{ColumnRange}, column_range::ColumnRange) = column_range
 column_bounds(r::ColumnRange) = (r.start, r.stop)
 Base.length(r::ColumnRange) = r.stop - r.start + 1
 
+<<<<<<< HEAD
 # ColumnRange iterator
 start(itr::ColumnRange) = itr.start
 done(itr::ColumnRange, column_index::Int) = column_index > itr.stop
@@ -326,24 +358,43 @@ next(itr::ColumnRange, column_index::Int) = (encode_column_number(column_index),
 # CellRange iterator
 start(rng::CellRange) = CellRefIteratorState(row_number(rng.start), column_number(rng.start))
 done(rng::CellRange, state::CellRefIteratorState) = state.row > row_number(rng.stop)
+=======
+# ColumnRange iterator: element is a String with the column name, the state is the column number.
+function Base.iterate(itr::ColumnRange, state::Int=itr.start)
+    if state > itr.stop
+        return nothing
+    end
+>>>>>>> upstream/master
 
-function Base.length(rng::CellRange)
-    (r, c) = size(rng)
-    return r * c
+    return encode_column_number(state), state + 1
 end
 
+<<<<<<< HEAD
 # (i, state) = next(I, state)
 function next(rng::CellRange, state::CellRefIteratorState)
     local next_state::CellRefIteratorState
     if state.col == column_number(rng.stop)
+=======
+# CellRange iterator: element is a CellRef, the state is a CellPosition.
+function Base.iterate(rng::CellRange, state::CellPosition=CellPosition(rng.start))
+
+    if row_number(state) > row_number(rng.stop)
+        return nothing
+    elseif column_number(state) == column_number(rng.stop)
+>>>>>>> upstream/master
         # reached last column. Go to the next row.
-        next_state = CellRefIteratorState(state.row + 1, column_number(rng.start))
+        next_state = CellPosition(row_number(state) + 1, column_number(rng.start))
     else
         # go to the next column
-        next_state = CellRefIteratorState(state.row, state.col + 1)
+        next_state = CellPosition(row_number(state), column_number(state) + 1)
     end
 
-    return CellRef(state.row, state.col), next_state
+    return CellRef(state), next_state
+end
+
+function Base.length(rng::CellRange)
+    (r, c) = size(rng)
+    return r * c
 end
 
 #
@@ -418,7 +469,7 @@ const RGX_SHEET_CELNAME_RIGHT_FIXED = r"\$[A-Z]+\$[0-9]+:\$[A-Z]+\$[0-9]+$"
 function SheetCellRef(n::AbstractString)
     if is_valid_fixed_sheet_cellname(n)
         fixed_cellname = match(RGX_CELLNAME_RIGHT_FIXED, n).match
-        cellname = replace(fixed_cellname, "\$", "")
+        cellname = replace(fixed_cellname, "\$" => "")
         sheetname = SubString(n, 1, length(n) - length(fixed_cellname) - 1)
         return SheetCellRef(sheetname, CellRef(cellname))
     else
@@ -432,7 +483,7 @@ end
 function SheetCellRange(n::AbstractString)
     if is_valid_fixed_sheet_cellrange(n)
         fixed_cellrange = match(RGX_SHEET_CELNAME_RIGHT_FIXED, n).match
-        cellrange = replace(fixed_cellrange, "\$", "")
+        cellrange = replace(fixed_cellrange, "\$" => "")
         sheetname = SubString(n, 1, length(n) - length(fixed_cellrange) - 1)
         return SheetCellRange(sheetname, CellRange(cellrange))
     else

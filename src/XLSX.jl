@@ -2,9 +2,16 @@
 __precompile__(true)
 module XLSX
 
+<<<<<<< HEAD
 import ZipFile
 import EzXML
 using Dates, Printf
+=======
+import Dates
+using Printf
+
+import ZipFile, EzXML
+>>>>>>> upstream/master
 
 # https://github.com/fhs/ZipFile.jl/issues/39
 if !hasmethod(Base.bytesavailable, Tuple{ZipFile.ReadableFile})
@@ -24,7 +31,6 @@ include("workbook.jl")
 include("worksheet.jl")
 include("cell.jl")
 include("styles.jl")
-include("deprecated.jl")
 include("write.jl")
 
 end # module XLSX

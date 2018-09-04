@@ -164,7 +164,7 @@ function _celldata_datetime(v::AbstractString, _is_date_1904::Bool) :: Union{Dat
     # does not allow empty string
     @assert !isempty(v) "Cannot convert an empty string into a datetime value."
 
-    if contains(v, ".")
+    if occursin(".", v)
         time_value = parse(Float64, v)
         @assert time_value >= 0
 
@@ -202,13 +202,13 @@ See also: `isdate1904` function.
 """
 function excel_value_to_date(x::Int, _is_date_1904::Bool) :: Dates.Date
     if _is_date_1904
-        return Date(Dates.rata2datetime(x + 695056))
+        return Dates.Date(Dates.rata2datetime(x + 695056))
     else
-        return Date(Dates.rata2datetime(x + 693594))
+        return Dates.Date(Dates.rata2datetime(x + 693594))
     end
 end
 
-function date_to_excel_value(date::Date, _is_date_1904::Bool) :: Int
+function date_to_excel_value(date::Dates.Date, _is_date_1904::Bool) :: Int
     if _is_date_1904
         return Dates.datetime2rata(date) - 695056
     else

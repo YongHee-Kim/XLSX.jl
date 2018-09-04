@@ -78,7 +78,11 @@ Example for `stop_in_row_function`:
 ```
 function stop_function(r)
     v = r[:col_label]
+<<<<<<< HEAD
     return !Missing.ismissing(v) && v == "unwanted value"
+=======
+    return !ismissing(v) && v == "unwanted value"
+>>>>>>> upstream/master
 end
 ```
 
@@ -94,7 +98,11 @@ end
 
 See also `gettable`.
 """
+<<<<<<< HEAD
 function eachtablerow(sheet::Worksheet, cols::Union{ColumnRange, AbstractString}; first_row::Int=_find_first_row_with_data(sheet, convert(ColumnRange, cols).start), column_labels::Vector{Symbol}=Vector{Symbol}(), header::Bool=true, stop_in_empty_row::Bool=true, stop_in_row_function::Union{Function, Nothing}=nothing) :: TableRowIterator
+=======
+function eachtablerow(sheet::Worksheet, cols::Union{ColumnRange, AbstractString}; first_row::Int=_find_first_row_with_data(sheet, convert(ColumnRange, cols).start), column_labels::Vector{Symbol}=Vector{Symbol}(), header::Bool=true, stop_in_empty_row::Bool=true, stop_in_row_function::Union{Nothing, Function}=nothing) :: TableRowIterator
+>>>>>>> upstream/master
     itr = eachrow(sheet)
     column_range = convert(ColumnRange, cols)
 
@@ -104,13 +112,13 @@ function eachtablerow(sheet::Worksheet, cols::Union{ColumnRange, AbstractString}
             for column_index in column_range.start:column_range.stop
                 sheet_row = find_row(itr, first_row)
                 cell = getcell(sheet_row, column_index)
-                @assert !isempty(cell) "Header cell can't be empty."
+                @assert !isempty(cell) "Header cell can't be empty ($(cell.ref))."
                 push!(column_labels, Symbol(getdata(sheet, cell)))
             end
         else
             # generate column_labels if there's no header information anywhere
             for c in column_range
-                push!(column_labels, c)
+                push!(column_labels, Symbol(c))
             end
         end
     else
@@ -119,9 +127,16 @@ function eachtablerow(sheet::Worksheet, cols::Union{ColumnRange, AbstractString}
     end
 
     first_data_row = header ? first_row + 1 : first_row
-    return TableRowIterator(itr, Index(column_range, column_labels), first_data_row, stop_in_empty_row, stop_in_row_function)
+    return TableRowIterator(sheet, Index(column_range, column_labels), first_data_row, stop_in_empty_row, stop_in_row_function)
 end
 
+<<<<<<< HEAD
+=======
+function TableRowIterator(sheet::Worksheet, index::Index, first_data_row::Int, stop_in_empty_row::Bool=true, stop_in_row_function::Union{Nothing, Function}=nothing)
+    return TableRowIterator(eachrow(sheet), index, first_data_row, stop_in_empty_row, stop_in_row_function)
+end
+
+>>>>>>> upstream/master
 function eachtablerow(sheet::Worksheet; first_row::Int = 1, column_labels::Vector{Symbol}=Vector{Symbol}(), header::Bool=true, stop_in_empty_row::Bool=true, stop_in_row_function::Union{Function, Nothing}=nothing) :: TableRowIterator
     for r in eachrow(sheet)
 
@@ -134,7 +149,11 @@ function eachtablerow(sheet::Worksheet; first_row::Int = 1, column_labels::Vecto
             columns_ordered = sort(collect(keys(r.rowcells)))
 
             for (ci, cn) in enumerate(columns_ordered)
+<<<<<<< HEAD
                 if !Missing.ismissing(getdata(r, cn))
+=======
+                if !ismissing(getdata(r, cn))
+>>>>>>> upstream/master
                     # found a row with data. Will get ColumnRange from non-empty consecutive cells
                     first_row = row_number(r)
                     column_start = cn
@@ -150,7 +169,11 @@ function eachtablerow(sheet::Worksheet; first_row::Int = 1, column_labels::Vecto
                             cn_stop = columns_ordered[ci_stop]
 
                             # Will stop if finds an empty cell or a skipped column
+<<<<<<< HEAD
                             if Missing.ismissing(getdata(r, cn_stop)) || (cn_stop - 1 != column_stop)
+=======
+                            if ismissing(getdata(r, cn_stop)) || (cn_stop - 1 != column_stop)
+>>>>>>> upstream/master
                                 column_range = ColumnRange(column_start, column_stop)
                                 return eachtablerow(sheet, column_range; first_row=first_row, column_labels=column_labels, header=header, stop_in_empty_row=stop_in_empty_row, stop_in_row_function=stop_in_row_function)
                             end
@@ -172,7 +195,11 @@ end
 function _find_first_row_with_data(sheet::Worksheet, column_number::Int)
     # will find first_row
     for r in eachrow(sheet)
+<<<<<<< HEAD
         if !Missing.ismissing(getdata(r, column_number))
+=======
+        if !ismissing(getdata(r, column_number))
+>>>>>>> upstream/master
             return row_number(r)
         end
     end
@@ -206,28 +233,49 @@ Maps table column index (1-based) -> sheet column index (cellref based)
 @inline get_column_label(r::TableRow, table_column_number::Int) = get_column_labels(r)[table_column_number]
 
 # iterate into TableRow to get each column value
+<<<<<<< HEAD
 start(r::TableRow) = start(table_column_numbers(r))
 done(r::TableRow, state) = done(table_column_numbers(r), state)
 
 function next(r::TableRow, state)
     (next_column_number, next_state) = next(table_column_numbers(r), state)
     return (r[next_column_number], next_state)
+=======
+
+function Base.iterate(r::TableRow)
+    next = iterate(table_column_numbers(r))
+    if next == nothing
+        return nothing
+    else
+        next_column_number, next_state = next
+        return r[next_column_number], next_state
+    end
+end
+
+function Base.iterate(r::TableRow, state)
+    next = iterate(table_column_numbers(r), state)
+    if next == nothing
+        return nothing
+    else
+        next_column_number, next_state = next
+        return r[next_column_number], next_state
+    end
+>>>>>>> upstream/master
 end
 
 Base.getindex(r::TableRow, x) = getdata(r, x)
 
-function TableRow(itr::TableRowIterator, sheet_row::SheetRow, row::Int)
-    ws = get_worksheet(itr)
-    index = itr.index
-    cell_values = Vector{CellValueType}()
+function TableRow(table_row::Int, index::Index, sheet_row::SheetRow)
+    ws = get_worksheet(sheet_row)
 
+    cell_values = Vector{CellValueType}()
     for table_column_number in table_column_numbers(index)
         sheet_column = table_column_to_sheet_column_number(index, table_column_number)
         cell = getcell(sheet_row, sheet_column)
         push!(cell_values, getdata(ws, cell))
     end
 
-    return TableRow(row, index, cell_values)
+    return TableRow(table_row, index, cell_values)
 end
 
 getdata(r::TableRow, table_column_number::Int) = r.cell_values[table_column_number]
@@ -241,68 +289,117 @@ function getdata(r::TableRow, column_label::Symbol)
     end
 end
 
+<<<<<<< HEAD
 
 function start(itr::TableRowIterator)
     last_state = start(itr.itr)
+=======
+function Base.iterate(itr::TableRowIterator)
+    next = iterate(itr.itr)
+>>>>>>> upstream/master
 
     # go to the first_data_row
-    while !done(itr.itr, last_state)
-        (sheet_row, state) = next(itr.itr, last_state)
+    while next != nothing
+        (sheet_row, sheet_row_iterator_state) = next
+
         if row_number(sheet_row) == itr.first_data_row
-            return TableRowIteratorState(state, sheet_row, 1, itr.first_data_row, false)
+            table_row_index = 1
+            return TableRow(table_row_index, itr.index, sheet_row), TableRowIteratorState(table_row_index, row_number(sheet_row), sheet_row_iterator_state)
+        else
+            next = iterate(itr.itr, sheet_row_iterator_state)
         end
-        last_state = state
     end
 
-    return TableRowIteratorState(state, sheet_row, 1, itr.first_data_row, true)
+    # no rows for this table
+    return nothing
 end
 
+<<<<<<< HEAD
 function next(itr::TableRowIterator, state::TableRowIteratorState)
     sheet_row_itr_is_done = done(itr.itr, state.state)
     current_sheet_row = state.sheet_row
     current_sheet_row_number = row_number(current_sheet_row)
+=======
+function Base.iterate(itr::TableRowIterator, state::TableRowIteratorState)
+    table_row_index = state.table_row_index + 1
+    next = iterate(itr.itr, state.sheet_row_iterator_state) # iterate the SheetRowIterator
+>>>>>>> upstream/master
 
-    if !sheet_row_itr_is_done
-        next_sheet_row, next_state = next(itr.itr, state.state)
-    else
-        next_sheet_row, next_state = current_sheet_row, state
+    if next == nothing
+        return nothing
     end
 
-    return TableRow(itr, current_sheet_row, state.table_row_index), TableRowIteratorState(next_state, next_sheet_row, state.table_row_index+1, current_sheet_row_number, sheet_row_itr_is_done)
-end
+    sheet_row, sheet_row_iterator_state = next
 
+<<<<<<< HEAD
 function done(itr::TableRowIterator, state::TableRowIteratorState)
-
-    # user asked to stop
-    if isa(itr.stop_in_row_function, Function) && itr.stop_in_row_function(TableRow(itr, state.sheet_row, state.table_row_index))
-        return true
-    end
-
-    # empty table case
-    if state.is_done
-        return true
-    elseif !itr.stop_in_empty_row
-        return false
-    end
+=======
+    #
+    # checks if we're done reading this table
+    #
+>>>>>>> upstream/master
 
     # check skipping rows
-    if row_number(state.sheet_row) != itr.first_data_row && row_number(state.sheet_row) != (state.last_sheet_row_number + 1)
+    # The XML can skip rows if there's no data in it,
+    # so this is why is_empty_table_row function below wouldn't catch this case
+    if itr.stop_in_empty_row && row_number(sheet_row) != itr.first_data_row && row_number(sheet_row) != (state.sheet_row_index + 1)
+        return nothing
+    end
+
+    # checks if there are any data inside column range
+    function is_empty_table_row(sheet_row::SheetRow) :: Bool
+
+        if isempty(sheet_row)
+            return true
+        end
+
+        for c in sheet_column_numbers(itr.index)
+            if !ismissing(getdata(get_worksheet(itr), getcell(sheet_row, c)))
+                return false
+            end
+        end
         return true
     end
 
-    # check empty rows
-    if isempty(state.sheet_row)
-        return true
-    end
-
+<<<<<<< HEAD
     # check if there are any data inside column range
     for c in sheet_column_numbers(itr.index)
         if !Missing.ismissing(getdata(get_worksheet(itr), getcell(state.sheet_row, c)))
             return false
+=======
+    if is_empty_table_row(sheet_row)
+        if itr.stop_in_empty_row
+            # user asked to stop fetching table rows if we find an empty row
+            return nothing
+        else
+            # keep looking for a non-empty row
+            next = iterate(itr.itr, sheet_row_iterator_state)
+            while next != nothing
+                sheet_row, sheet_row_iterator_state = next
+                if !is_empty_table_row(sheet_row)
+                    break
+                end
+                next = iterate(itr.itr, sheet_row_iterator_state)
+            end
+
+            if next == nothing
+                # end of file
+                return nothing
+            end
+>>>>>>> upstream/master
         end
     end
 
-    return true
+    @assert !is_empty_table_row(sheet_row) # if the `is_empty_table_row` check above was successful, we can't get empty sheet_row here
+    table_row = TableRow(table_row_index, itr.index, sheet_row)
+
+    # user asked to stop
+    if itr.stop_in_row_function != nothing && itr.stop_in_row_function(table_row)
+        return nothing
+    end
+
+    # we got a row to return
+    return table_row, TableRowIteratorState(table_row_index, row_number(sheet_row), sheet_row_iterator_state)
 end
 
 function infer_eltype(v::Vector{Any})
@@ -314,7 +411,11 @@ function infer_eltype(v::Vector{Any})
     end
 
     for i in 1:length(v)
+<<<<<<< HEAD
         if Missing.ismissing(v[i])
+=======
+        if ismissing(v[i])
+>>>>>>> upstream/master
             hasmissing = true
         else
             if t != Any && typeof(v[i]) != t
@@ -329,7 +430,11 @@ function infer_eltype(v::Vector{Any})
         return Any
     else
         if hasmissing
+<<<<<<< HEAD
             return Union{Missing.Missing, t}
+=======
+            return Union{Missing, t}
+>>>>>>> upstream/master
         else
             return t
         end
@@ -341,7 +446,7 @@ infer_eltype(v::Vector{T}) where T = T
 function gettable(itr::TableRowIterator; infer_eltypes::Bool=false)
     column_labels = get_column_labels(itr)
     columns_count = table_columns_count(itr)
-    data = Vector{Any}(columns_count)
+    data = Vector{Any}(undef, columns_count)
     for c in 1:columns_count
         data[c] = Vector{Any}()
     end
@@ -351,7 +456,11 @@ function gettable(itr::TableRowIterator; infer_eltypes::Bool=false)
 
         for (ci, cv) in enumerate(r) # iterate a TableRow to get column data
             push!(data[ci], cv)
+<<<<<<< HEAD
             if !Missing.ismissing(cv)
+=======
+            if !ismissing(cv)
+>>>>>>> upstream/master
                 is_empty_row = false
             end
         end
@@ -367,7 +476,7 @@ function gettable(itr::TableRowIterator; infer_eltypes::Bool=false)
     if infer_eltypes
         rows = length(data[1])
         for c in 1:columns_count
-            new_column_data = Vector{infer_eltype(data[c])}(rows)
+            new_column_data = Vector{infer_eltype(data[c])}(undef, rows)
             for r in 1:rows
                 new_column_data[r] = data[c][r]
             end
@@ -417,11 +526,15 @@ Example for `stop_in_row_function`:
 ```
 function stop_function(r)
     v = r[:col_label]
+<<<<<<< HEAD
     return !Missing.ismissing(v) && v == "unwanted value"
+=======
+    return !ismissing(v) && v == "unwanted value"
+>>>>>>> upstream/master
 end
 ```
 
-Rows where all column values are equal to `Missing.missing` are dropped.
+Rows where all column values are equal to `missing` are dropped.
 
 Example code for `gettable`:
 

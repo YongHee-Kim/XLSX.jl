@@ -29,14 +29,13 @@ function open_empty_template(sheetname::AbstractString="") :: XLSXFile
 end
 
 """
-    writexlsx(output_filepath, xlsx_file; [overwrite])
-"""
-function writexlsx(output_filepath::AbstractString, xf::XLSXFile; overwrite::Bool=false, rewrite=nothing)
+    writexlsx(output_filepath, xlsx_file; [overwrite=false])
 
-    # rewrite is deprecated
-    if rewrite != nothing
-        error("`rewrite` keyword argument was renamed to `overwrite` in `XLSX.writexlsx`.")
-    end
+Writes an Excel file given by `xlsx_file::XLSXFile` to file at path `output_filepath`.
+
+If `overwrite=true`, `output_filepath` will be overwritten if it exists.
+"""
+function writexlsx(output_filepath::AbstractString, xf::XLSXFile; overwrite::Bool=false)
 
     @assert is_writable(xf) "XLSXFile instance is not writable."
     @assert !isopen(xf) "Can't save an open XLSXFile."
@@ -74,7 +73,11 @@ function writexlsx(output_filepath::AbstractString, xf::XLSXFile; overwrite::Boo
     close(xlsx)
 
     # fix libuv issue on windows (#42)
+<<<<<<< HEAD
     Sys.iswindows ? gc() : nothing
+=======
+    @static Sys.iswindows() ? GC.gc() : nothing
+>>>>>>> upstream/master
 end
 
 get_worksheet_internal_file(ws::Worksheet) = "xl/" * get_relationship_target_by_id(get_workbook(ws), ws.relationship_id)
@@ -122,7 +125,7 @@ function update_worksheets_xml!(xl::XLSXFile)
         doc_copy = EzXML.parsexml(String(take!(buff)))
 
         # deletes all elements under sheetData
-        child_nodes = EzXML.find(EzXML.root(doc_copy), "/xpath:worksheet/xpath:sheetData/xpath:row", SPREADSHEET_NAMESPACE_XPATH_ARG)
+        child_nodes = EzXML.findall("/xpath:worksheet/xpath:sheetData/xpath:row", EzXML.root(doc_copy), SPREADSHEET_NAMESPACE_XPATH_ARG)
         for c in child_nodes
             EzXML.unlink!(c)
         end
@@ -130,7 +133,7 @@ function update_worksheets_xml!(xl::XLSXFile)
         child_nodes = nothing
 
         # updates sheetData
-        sheetData_node = EzXML.findfirst(EzXML.root(doc_copy), "/xpath:worksheet/xpath:sheetData", SPREADSHEET_NAMESPACE_XPATH_ARG)
+        sheetData_node = EzXML.findfirst("/xpath:worksheet/xpath:sheetData", EzXML.root(doc_copy), SPREADSHEET_NAMESPACE_XPATH_ARG)
         spans_str = string(column_number(get_dimension(sheet).start), ":", column_number(get_dimension(sheet).stop))
 
         # iterates over WorksheetCache cells and write the XML
@@ -169,7 +172,7 @@ function update_worksheets_xml!(xl::XLSXFile)
         end
 
         # updates worksheet dimension
-        dimension_node = EzXML.findfirst(EzXML.root(doc_copy), "/xpath:worksheet/xpath:dimension", SPREADSHEET_NAMESPACE_XPATH_ARG)
+        dimension_node = EzXML.findfirst("/xpath:worksheet/xpath:dimension", EzXML.root(doc_copy), SPREADSHEET_NAMESPACE_XPATH_ARG)
         dimension_node["ref"] = string(get_dimension(sheet))
 
         set_worksheet_xml_document!(sheet, doc_copy)
@@ -180,8 +183,8 @@ end
 
 function setdata!(ws::Worksheet, cell::Cell)
     @assert is_writable(get_xlsxfile(ws)) "XLSXFile instance is not writable."
-    @assert !isnull(ws.cache) "Can't write data to a Worksheet with empty cache."
-    cache = get(ws.cache)
+    @assert ws.cache != nothing "Can't write data to a Worksheet with empty cache."
+    cache = ws.cache
 
     r = row_number(cell)
     c = column_number(cell)
@@ -261,7 +264,7 @@ end
 xlsx_encode(::Worksheet, val::Missing) = ("", "")
 xlsx_encode(::Worksheet, val::Bool) = ("b", val ? "1" : "0")
 xlsx_encode(::Worksheet, val::Union{Int, Float64}) = ("", string(val))
-xlsx_encode(ws::Worksheet, val::Date) = ("", string(date_to_excel_value(val, isdate1904(get_xlsxfile(ws)))))
+xlsx_encode(ws::Worksheet, val::Dates.Date) = ("", string(date_to_excel_value(val, isdate1904(get_xlsxfile(ws)))))
 xlsx_encode(ws::Worksheet, val::Dates.DateTime) = ("", string(datetime_to_excel_value(val, isdate1904(get_xlsxfile(ws)))))
 xlsx_encode(::Worksheet, val::Dates.Time) = ("", string(time_to_excel_value(val)))
 
@@ -404,6 +407,8 @@ function addsheet!(wb::Workbook, name::AbstractString="") :: Worksheet
         end
     end
 
+    @assert name != ""
+
     # generate sheetId
     current_sheet_ids = [ ws.sheetId for ws in wb.sheets ]
     sheetId = max(current_sheet_ids...) + 1
@@ -433,12 +438,16 @@ function addsheet!(wb::Workbook, name::AbstractString="") :: Worksheet
     ws = Worksheet(xf, sheetId, rId, name, CellRange("A1:A1"))
 
     # creates a mock WorksheetCache
+    # because we can't write to sheet with empty cache (see setdata!(ws::Worksheet, cell::Cell))
+    # and the stream should be closed
+    # to indicate that no more rows will be fetched from SheetRowStreamIterator in Base.iterate(ws_cache::WorksheetCache, row_from_last_iteration::Int)
     itr = SheetRowStreamIterator(ws)
     zip_io, reader = open_internal_file_stream(xf, "[Content_Types].xml") # could be any file
-    state = SheetRowStreamIteratorState(zip_io, reader, true, true, 0)
+    state = SheetRowStreamIteratorState(zip_io, reader, true, 0)
     close(state)
     ws.cache = WorksheetCache(CellCache(), Vector{Int}(), Dict{Int, Int}(), itr, state)
 
+    # adds the new sheet to the list of sheets in the workbook
     push!(wb.sheets, ws)
 
     # updates workbook xml
@@ -480,12 +489,7 @@ df = DataFrames.DataFrame(integers=[1, 2, 3, 4], strings=["Hey", "You", "Out", "
 XLSX.writetable("df.xlsx", DataFrames.columns(df), DataFrames.names(df))
 ```
 """
-function writetable(filename::AbstractString, data, columnnames; overwrite::Bool=false, sheetname::AbstractString="", anchor_cell::Union{String, CellRef}=CellRef("A1"), rewrite=nothing)
-
-    # rewrite is deprecated
-    if rewrite != nothing
-        error("`rewrite` keyword argument was renamed to `overwrite` in `XLSX.writetable`.")
-    end
+function writetable(filename::AbstractString, data, columnnames; overwrite::Bool=false, sheetname::AbstractString="", anchor_cell::Union{String, CellRef}=CellRef("A1"))
 
     if !overwrite
         @assert !isfile(filename) "$filename already exists."
@@ -527,11 +531,6 @@ XLSX.writetable("report.xlsx", REPORT_A=( DataFrames.columns(df1), DataFrames.na
 """
 function writetable(filename::AbstractString; overwrite::Bool=false, kw...)
 
-    # rewrite keyword is deprecated
-    if !isempty(kw) && isa(kw[1], Tuple{Symbol, Bool}) && kw[1][1] == :rewrite
-        error("`rewrite` keyword argument was renamed to `overwrite` in `XLSX.writetable`.")
-    end
-
     if !overwrite
         @assert !isfile(filename) "$filename already exists."
     end
@@ -558,12 +557,7 @@ function writetable(filename::AbstractString; overwrite::Bool=false, kw...)
     nothing
 end
 
-function writetable(filename::AbstractString, tables::Vector{Tuple{String, Vector{Any}, Vector{T}}}; overwrite::Bool=false, rewrite=nothing) where {T<:Union{String, Symbol}}
-
-    # rewrite is deprecated
-    if rewrite != nothing
-        error("`rewrite` keyword argument was renamed to `overwrite` in `XLSX.writexlsx`.")
-    end
+function writetable(filename::AbstractString, tables::Vector{Tuple{String, Vector{Any}, Vector{T}}}; overwrite::Bool=false) where {T<:Union{String, Symbol}}
 
     if !overwrite
         @assert !isfile(filename) "$filename already exists."

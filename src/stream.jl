@@ -1,17 +1,18 @@
 
 #=
-https://docs.julialang.org/en/stable/manual/interfaces/#man-interface-iteration-1
+https://docs.julialang.org/en/v1/base/collections/#lib-collections-iteration-1
 
-for i = I   # or  "for i in I"
+for i in iter   # or  "for i = iter"
     # body
 end
 
 is translated into:
 
-state = start(I)
-while !done(I, state)
-    (i, state) = next(I, state)
+next = iterate(iter)
+while next != nothing
+    (i, state) = next
     # body
+    next = iterate(iter, state)
 end
 =#
 
@@ -37,6 +38,8 @@ The iterator element is a SheetRow.
 
 @inline get_worksheet(itr::SheetRowStreamIterator) = itr.sheet
 @inline row_number(state::SheetRowStreamIteratorState) = state.row
+
+Base.show(io::IO, state::SheetRowStreamIteratorState) = print(io, "SheetRowStreamIteratorState( is open = $(state.is_open) , row = $(state.row) )")
 
 """
 Open a file for streaming.
@@ -73,9 +76,9 @@ end
 Creates a reader for row elements in the Worksheet's XML.
 Will return a stream reader positioned in the first row element if it exists.
 
-If there's no row element inside sheetData XML tag, it will return a closed iterator
-with `done_reading=true`.
+If there's no row element inside sheetData XML tag, it will close all streams and return `nothing`.
 """
+<<<<<<< HEAD
 function start(itr::SheetRowStreamIterator)
     ws = get_worksheet(itr)
     target_file = "xl/" * get_relationship_target_by_id(get_workbook(ws), ws.relationship_id)
@@ -90,26 +93,48 @@ function start(itr::SheetRowStreamIterator)
             break
         end
     end
+=======
+function Base.iterate(itr::SheetRowStreamIterator, state::Union{Nothing, SheetRowStreamIteratorState}=nothing)
 
-    @assert EzXML.nodename(reader) == "sheetData" "Malformed Worksheet \"$(ws.name)\": Couldn't find sheetData element."
+    if state == nothing # first iteration. Will open a stream and create the first state instance
+        state = let
+            ws = get_worksheet(itr)
+            target_file = "xl/" * get_relationship_target_by_id(get_workbook(ws), ws.relationship_id)
+            zip_io, reader = open_internal_file_stream(get_xlsxfile(ws), target_file)
 
-    # Now let's look for a row element, if it exists
-    while !EzXML.done(reader) # go next node
-        if EzXML.nodetype(reader) == EzXML.READER_ELEMENT && EzXML.nodename(reader) == "row"
-            break
-        elseif is_end_of_sheet_data(reader)
-            # this Worksheet has no rows
-            done_reading = true
-            break
+            # The reader will be positioned in the first row element inside sheetData
+            # First, let's look for sheetData opening element
+            while EzXML.iterate(reader) != nothing
+                if EzXML.nodetype(reader) == EzXML.READER_ELEMENT && EzXML.nodename(reader) == "sheetData"
+                    @assert EzXML.nodedepth(reader) == 1 "Malformed Worksheet \"$(ws.name)\": unexpected node depth for sheetData node: $(EzXML.nodedepth(reader))."
+                    break
+                end
+            end
+>>>>>>> upstream/master
+
+            @assert EzXML.nodename(reader) == "sheetData" "Malformed Worksheet \"$(ws.name)\": Couldn't find sheetData element."
+
+            # Now let's look for a row element, if it exists
+            while EzXML.iterate(reader) != nothing # go next node
+                if EzXML.nodetype(reader) == EzXML.READER_ELEMENT && EzXML.nodename(reader) == "row"
+                    break
+                elseif is_end_of_sheet_data(reader)
+                    # this Worksheet has no rows
+                    close(reader)
+                    close(zip_io)
+                    return nothing
+                end
+            end
+
+            # row number is set to 0 in the first state
+            SheetRowStreamIteratorState(zip_io, reader, true, 0)
         end
     end
 
-    # row number is set to 0 in the first state
-    result = SheetRowStreamIteratorState(zip_io, reader, done_reading, true, 0)
-    if done_reading
-        close(result)
-    end
+    # given that the first iteration case is done in the code above, we shouldn't get it again in here
+    @assert state != nothing
 
+<<<<<<< HEAD
     return result
 end
 
@@ -117,25 +142,40 @@ end
 
 function next(itr::SheetRowStreamIterator, state::SheetRowStreamIteratorState)
     @assert isopen(state) "Can't fetch rows from a closed workbook."
+=======
+    reader = state.xml_stream_reader
+    if is_end_of_sheet_data(reader)
+        @assert !isopen(state)
+        return nothing
+    else
+        @assert isopen(state) "Can't fetch rows from a closed workbook."
+    end
+
+>>>>>>> upstream/master
     # will read next row from stream.
     # The stream should be already positioned in the next row
-    reader = state.xml_stream_reader
-
     @assert EzXML.nodename(reader) == "row"
     current_row = parse(Int, reader["r"])
-    done_reading = false
     rowcells = Dict{Int, Cell}() # column -> cell
 
     # iterate thru row cells
-    while !done(reader)
+    while EzXML.iterate(reader) != nothing
 
         # If this is the end of this row, will point to the next row or set the end of this stream
         if EzXML.nodetype(reader) == EzXML.READER_END_ELEMENT && EzXML.nodename(reader) == "row"
-            done(reader) # go to the next node
-            if is_end_of_sheet_data(reader)
-                # mark end of stream
-                done_reading = true
+
+            # go to the next node, but also checks if we reached EOF (in the case of malformed XML)
+            if EzXML.iterate(reader) == nothing
                 close(state)
+                error("Malformed Excel file.")
+            end
+
+            if is_end_of_sheet_data(reader)
+
+                # marks the end of the row
+                close(state)
+                break
+
             else
                 # make sure we're pointing to the next row node
                 @assert EzXML.nodetype(reader) == EzXML.READER_ELEMENT && EzXML.nodename(reader) == "row"
@@ -156,9 +196,7 @@ function next(itr::SheetRowStreamIterator, state::SheetRowStreamIteratorState)
     sheet_row = SheetRow(get_worksheet(itr), current_row, rowcells)
 
     # update state
-    state.done_reading = done_reading
     state.row = current_row
-
     return sheet_row, state
 end
 
@@ -199,14 +237,13 @@ end
 
 function WorksheetCache(ws::Worksheet)
     itr = SheetRowStreamIterator(ws)
-    state = start(itr)
-
-    return WorksheetCache(CellCache(), Vector{Int}(), Dict{Int, Int}(), itr, state)
+    return WorksheetCache(CellCache(), Vector{Int}(), Dict{Int, Int}(), itr, nothing)
 end
 
 @inline get_worksheet(r::SheetRow) = r.sheet
 @inline get_worksheet(itr::WorksheetCache) = get_worksheet(itr.stream_iterator)
 
+<<<<<<< HEAD
 # state is the row number. At the start state, no row has been ready, so let's set to 0.
 start(itr::WorksheetCache) = 0
 
@@ -235,33 +272,33 @@ end
 function next(ws_cache::WorksheetCache, row_from_last_iteration::Int)
 
     # fetches the next row
+=======
+# In the WorksheetCache iterator, the element is a SheetRow, the state is the row number
+function Base.iterate(ws_cache::WorksheetCache, row_from_last_iteration::Int=0)
+
+>>>>>>> upstream/master
     if row_from_last_iteration == 0 && !isempty(ws_cache.rows_in_cache)
+
         # the next row is in cache, and it's the first one
         current_row_number = ws_cache.rows_in_cache[1]
         sheet_row_cells = ws_cache.cells[current_row_number]
-
-        # debug
-        #info("Fetched row $current_row_number from cache")
-
         return SheetRow(get_worksheet(ws_cache), current_row_number, sheet_row_cells), current_row_number
 
     elseif row_from_last_iteration != 0 && ws_cache.row_index[row_from_last_iteration] < length(ws_cache.rows_in_cache)
+
         # the next row is in cache
         current_row_number = ws_cache.rows_in_cache[ws_cache.row_index[row_from_last_iteration] + 1]
         sheet_row_cells = ws_cache.cells[current_row_number]
-
-        # debug
-        #info("Fetched row $current_row_number from cache")
-
         return SheetRow(get_worksheet(ws_cache), current_row_number, sheet_row_cells), current_row_number
 
     else
-        # will read next row from stream.
-        @assert row_from_last_iteration == row_number(ws_cache.stream_state) "Inconsistent state: row_from_last_iteration = $(row_from_last_iteration), stream_state row = $(row_number(ws_cache.stream_state))."
-        sheet_row, next_stream_state = next(ws_cache.stream_iterator, ws_cache.stream_state)
 
-        # debug
-        #info("Fetched row $(row_number(sheet_row)) from stream")
+        next = iterate(ws_cache.stream_iterator, ws_cache.stream_state)
+        if next == nothing
+            return nothing
+        end
+
+        sheet_row, next_stream_state = next
 
         # add new row to WorkSheetCache
         push_sheetrow!(ws_cache, sheet_row)
@@ -321,7 +358,11 @@ end
 """
 function eachrow(ws::Worksheet) :: SheetRowIterator
     if is_cache_enabled(ws)
+<<<<<<< HEAD
         if ismissing(ws.cache)
+=======
+        if ws.cache == nothing
+>>>>>>> upstream/master
             ws.cache = WorksheetCache(ws)
         end
         return ws.cache

@@ -1,4 +1,9 @@
 
+struct CellPosition
+    row::Int
+    column::Int
+end
+
 """
 A `CellRef` represents a cell location given by row and column identifiers.
 
@@ -97,7 +102,7 @@ struct ColumnRange
 
     function ColumnRange(a::Int, b::Int)
         @assert a <= b "Invalid ColumnRange. Start column must be located before end column."
-        new(a, b)
+        return new(a, b)
     end
 end
 
@@ -153,17 +158,16 @@ abstract type SheetRowIterator end
 mutable struct SheetRowStreamIteratorState
     zip_io::ZipFile.Reader
     xml_stream_reader::EzXML.StreamReader
-    done_reading::Bool # true when we reach the end of sheetData XML element
     is_open::Bool # indicated if zip_io and xml_stream_reader are opened
     row::Int # number of current row. It´s set to 0 in the start state.
 end
 
-mutable struct WorksheetCache <: SheetRowIterator
+mutable struct WorksheetCache{I<:SheetRowIterator} <: SheetRowIterator
     cells::CellCache # SheetRowNumber -> Dict{column_number, Cell}
     rows_in_cache::Vector{Int} # ordered vector with row numbers that are stored in cache
     row_index::Dict{Int, Int} # maps a row number to the index of the row number in rows_in_cache
-    stream_iterator::SheetRowIterator
-    stream_state::SheetRowStreamIteratorState
+    stream_iterator::I
+    stream_state::Union{Nothing, SheetRowStreamIteratorState}
 end
 
 mutable struct Worksheet
@@ -172,9 +176,16 @@ mutable struct Worksheet
     relationship_id::String # r:id="rId1"
     name::String
     dimension::CellRange
+<<<<<<< HEAD
     cache::Union{Missing, WorksheetCache}
 
     function Worksheet(package::MSOfficePackage, sheetId::Int, relationship_id::String, name::String, dimension::CellRange)
+=======
+    cache::Union{WorksheetCache, Nothing}
+
+    function Worksheet(package::MSOfficePackage, sheetId::Int, relationship_id::String, name::String, dimension::CellRange)
+        return new(package, sheetId, relationship_id, name, dimension, nothing)
+>>>>>>> upstream/master
     end
 end
 
@@ -207,7 +218,11 @@ mutable struct Workbook
     buffer_styles_is_datetime::Dict{Int, Bool}   # cell style -> true if is datetime
     workbook_names::Dict{String, DefinedNameValueTypes} # definedName
     worksheet_names::Dict{Tuple{Int, String}, DefinedNameValueTypes} # definedName. (sheetId, name) -> value.
+<<<<<<< HEAD
     styles_xroot::Union{Missing, EzXML.Node}
+=======
+    styles_xroot::Union{EzXML.Node, Nothing}
+>>>>>>> upstream/master
 end
 
 """
@@ -249,12 +264,13 @@ struct SheetRow
     rowcells::Dict{Int, Cell} # column -> value
 end
 
-mutable struct Index # based on DataFrames.jl
-    lookup::Dict{Symbol, Int} # name -> table column index
+struct Index # based on DataFrames.jl
+    lookup::Dict{Symbol, Int} # column label -> table column index
     column_labels::Vector{Symbol}
     column_map::Dict{Int, Int} # table column index (1-based) -> sheet column index (cellref based)
 
-    function Index(column_range::ColumnRange, column_labels::Vector{Symbol})
+    function Index(column_range::Union{ColumnRange, AbstractString}, column_labels::Vector{Symbol})
+        column_range = convert(ColumnRange, column_range)
         @assert length(unique(column_labels)) == length(column_labels) "Column labels must be unique."
 
         lookup = Dict{Symbol, Int}()
@@ -270,12 +286,16 @@ mutable struct Index # based on DataFrames.jl
     end
 end
 
-struct TableRowIterator
-    itr::SheetRowIterator
+struct TableRowIterator{I<:SheetRowIterator}
+    itr::I
     index::Index
     first_data_row::Int
     stop_in_empty_row::Bool
+<<<<<<< HEAD
     stop_in_row_function::Union{Function, Nothing}
+=======
+    stop_in_row_function::Union{Nothing, Function}
+>>>>>>> upstream/master
 end
 
 struct TableRow
@@ -284,15 +304,8 @@ struct TableRow
     cell_values::Vector{CellValueType}
 end
 
-struct TableRowIteratorState
-    state::Any
-    sheet_row::SheetRow
+struct TableRowIteratorState{S}
     table_row_index::Int
-    last_sheet_row_number::Int
-    is_done::Bool
-end
-
-struct CellRefIteratorState
-    row::Int
-    col::Int
+    sheet_row_index::Int
+    sheet_row_iterator_state::S
 end
